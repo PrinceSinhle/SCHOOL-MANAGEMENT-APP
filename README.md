@@ -65,3 +65,70 @@ The system uses JDBC for database communication and Apache Derby as the database
 ---
 
 ## Project Structure
+School-Management-System
+├── src
+│   └── schoolmanagement
+│       └── za
+│           ├── GUI Classes
+│           ├── Database Classes
+│           ├── Management Classes
+│           └── Model Classes
+│
+├── screenshots
+│
+├── README.md
+└── build.xml
+
+---
+
+## Screenshots
+
+### Login Screen
+
+![Login](screenshots/login.png)
+
+### Teacher Dashboard
+
+![Teacher Dashboard](screenshots/teacher-dashboard.png)
+
+### Teacher Registration
+
+![Teacher Registration](screenshots/register-teacher.png)
+
+### Learner Registration
+
+![Learner Registration](screenshots/register-leaner.png)
+
+---
+
+## How To Run
+
+1. Clone the repository:
+git clone https://github.com/PrinceSinhle/SCHOOL-MANAGEMENT-APP.git
+
+2. Open the project using NetBeans IDE.
+
+3. Configure the Apache Derby database connection.
+
+4. Run the application from:
+
+App.java
+
+---
+
+## Future Improvements
+
+- Attendance management
+- Report generation
+- Export academic reports
+- Improved user roles and permissions
+- Additional database support
+
+---
+
+## Author
+
+PrinceSinhle
+
+GitHub:
+https://github.com/PrinceSinhle
