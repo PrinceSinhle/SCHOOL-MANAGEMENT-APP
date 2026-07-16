@@ -1,266 +1,67 @@
-# \# 🎓 School Management System
+# School Management System
 
-# 
+A Java Swing desktop application designed to manage school records, including teacher information, learner information, authentication, and student marks management.
 
-# A Java desktop application developed using \*\*Java Swing\*\*, \*\*JDBC\*\*, and \*\*Apache Derby\*\* to simplify the management of teachers, learners, and student academic records in a school environment.
+The system uses JDBC for database communication and Apache Derby as the database platform to perform CRUD operations and store application data.
 
-# 
+---
 
-# This project was developed as part of my third-year Software Development studies and later refactored to improve the user interface, project structure, and overall maintainability.
+## Features
 
-# 
+### Login System
 
-# \---
+- User authentication
+- Secure login validation
+- Session management
 
-# 
+### Teacher Management
 
-# \## Features
+- Register new teachers
+- View teacher records
+- Update teacher information
+- Delete teacher records
+- Assign teacher roles
+- Select teacher qualifications
 
-# 
+### Teacher Dashboard
 
-# \### 🔐 Authentication
+- Central navigation interface
+- Quick access to management modules
+- Improved user experience
 
-# \- Secure teacher login
+### Learner Management
 
-# \- Password validation
+- Register learners
+- View learner records
+- Update learner information
+- Delete learner records
+- Manage learner details
 
-# \- User authentication using JDBC
+### Student Marks Management
 
-# 
+- Record student marks
+- View marks records
+- Update marks
+- Delete marks
+- Store academic information using the database
 
-# \### 📋 Teacher Dashboard
+### Database Management
 
-# \- Central navigation dashboard
+- JDBC database connection
+- Apache Derby integration
+- CRUD operations
+- Database-driven application structure
 
-# \- Access to teacher, learner, and marks management
+---
 
-# 
+## Technologies Used
 
-# \### 👨‍🏫 Teacher Management
+- Java
+- Java Swing
+- JDBC
+- Apache Derby Database
+- NetBeans IDE
 
-# \- Register teachers
+---
 
-# \- Delete teachers
-
-# \- Load teacher records
-
-# \- Assign teacher roles
-
-# \- Select qualifications
-
-# \- Input validation
-
-# 
-
-# \### 👨‍🎓 Learner Management
-
-# \- Register learners
-
-# \- Update learner information
-
-# \- Delete learners
-
-# \- Load learner records
-
-# \- Grade management
-
-# \- Input validation
-
-# 
-
-# \### 📝 Student Marks Management
-
-# \- Record student marks
-
-# \- Update marks
-
-# \- Delete marks
-
-# \- Load marks
-
-# \- Store marks in the Derby database
-
-# 
-
-# \### 💾 Database
-
-# \- Apache Derby
-
-# \- JDBC
-
-# \- Prepared Statements
-
-# \- CRUD Operations
-
-# 
-
-# \---
-
-# 
-
-# \## Technologies Used
-
-# 
-
-# \- Java
-
-# \- Java Swing
-
-# \- JDBC
-
-# \- Apache Derby
-
-# \- NetBeans IDE
-
-# 
-
-# \---
-
-# 
-
-# \## Project Structure
-
-# 
-
-# ```
-
-# src
-
-# │
-
-# ├── schoolmanagement
-
-# │      └── za
-
-# │            ├── GUI
-
-# │            ├── Database
-
-# │            ├── Management
-
-# │            ├── Models
-
-# │            └── App.java
-
-# ```
-
-# 
-
-# \---
-
-# 
-
-# \## Screenshots
-
-# 
-
-# \### Login
-
-# 
-
-# !\[Login](screenshots/login.png)
-
-# 
-
-# \---
-
-# 
-
-# \### Teacher Dashboard
-
-# 
-
-# !\[Dashboard](screenshots/teacher-dashboard.png)
-
-# 
-
-# \---
-
-# 
-
-# \### Teacher Registration
-
-# 
-
-# !\[Teacher](screenshots/register-teacher.png)
-
-# 
-
-# \---
-
-# 
-
-# \### Learner Registration
-
-# 
-
-# !\[Learner](screenshots/register-leaner.png)
-
-# 
-
-# \---
-
-# 
-
-# \## Getting Started
-
-# 
-
-# 1\. Clone this repository
-
-# 
-
-# ```bash
-
-# git clone https://github.com/YOUR\_USERNAME/SCHOOL-MANAGEMENT-APP.git
-
-# ```
-
-# 
-
-# 2\. Open the project in NetBeans.
-
-# 
-
-# 3\. Configure Apache Derby.
-
-# 
-
-# 4\. Run the application.
-
-# 
-
-# \---
-
-# 
-
-# \## Future Improvements
-
-# 
-
-# \- Attendance Management
-
-# \- Report Generation
-
-# \- Performance Analytics
-
-# \- Export Reports
-
-# \- MySQL Support
-
-# 
-
-# \---
-
-# 
-
-# \## Author
-
-# 
-
-# \*\*Sinhle Nkosi\*\*
-
-# 
-
-# GitHub: https://github.com/YOUR\_USERNAME
-
+## Project Structure
