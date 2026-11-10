@@ -1,4 +1,6 @@
-build/ 
-dist/ 
-nbproject/private/ 
-*.class 
+build/
+dist/
+target/
+nbproject/private/
+*.class
+dependency-reduced-pom.xml

@@ -2,7 +2,7 @@
 
 A Java Swing desktop application designed to manage school records, including teacher information, learner information, authentication, and student marks management.
 
-The system uses JDBC for database communication and Apache Derby as the database platform to perform CRUD operations and store application data.
+The system uses JDBC with MySQL Server. MySQL Workbench is used to configure and inspect the database.
 
 ---
 
@@ -39,18 +39,32 @@ The system uses JDBC for database communication and Apache Derby as the database
 
 ### Student Marks Management
 
-- Record student marks
+- Record marks for a learner selected from the register
 - View marks records
 - Update marks
 - Delete marks
-- Store academic information using the database
+- Search and export marks to CSV
+
+### Attendance and Reports
+
+- Record daily present, absent, or late status
+- Prevent duplicate attendance entries for the same learner and date
+- Export attendance records to CSV
+
+### Backups
+
+- Create a full database backup
+- Restore a backup using a transaction
+- Restrict backup and restore actions to administrators
 
 ### Database Management
 
 - JDBC database connection
-- Apache Derby integration
+- MySQL Server and MySQL Connector/J
 - CRUD operations
-- Database-driven application structure
+- Learner foreign-key relationships and attendance records
+- Background database tasks to keep the interface responsive
+- Windows app-image packaging with `jpackage`
 
 ---
 
@@ -59,8 +73,9 @@ The system uses JDBC for database communication and Apache Derby as the database
 - Java
 - Java Swing
 - JDBC
-- Apache Derby Database
-- NetBeans IDE
+- MySQL Server
+- MySQL Connector/J
+- Maven
 
 ---
 
@@ -83,21 +98,33 @@ School-Management-System
 
 ## Screenshots
 
-### Login Screen
+### Login
 
 ![Login](screenshots/login.png)
 
+### Administrator Dashboard
+
+![Administrator Dashboard](screenshots/admin-dash.png)
+
 ### Teacher Dashboard
 
-![Teacher Dashboard](screenshots/teacher-dashboard.png)
+![Teacher Dashboard](screenshots/manage_teacher.png)
 
-### Teacher Registration
+### Learner Dashboard
 
-![Teacher Registration](screenshots/register-teacher.png)
+![Learner Dashboard](screenshots/manage_leaner.png)
 
-### Learner Registration
+### Attendance
 
-![Learner Registration](screenshots/register-leaner.png)
+![Attendance](screenshots/attendace.png)
+
+### Backing Up Data
+
+![Backup Data](screenshots/backup_data.png)
+
+### Restoring Data
+
+![Restore Data](screenshots/restore_data.png)
 
 ---
 
@@ -106,23 +133,37 @@ School-Management-System
 1. Clone the repository:
 git clone https://github.com/PrinceSinhle/SCHOOL-MANAGEMENT-APP.git
 
-2. Open the project using NetBeans IDE.
+2. Install and start MySQL Server 8.0 or later. Workbench is the management client; it does not replace the server.
+3. In Workbench, open `database/mysql-setup.sql`, replace the sample account password, and run it using an administrator connection.
+4. Optional: in Workbench, run `database/seed-demo-learners.sql` to add 200 fictional learners with synthetic 13-digit IDs and fake contact numbers across Grades 1–7. These values are for demonstration only and are not verified against Home Affairs.
+5. Set the Windows user environment variable `SCHOOL_DB_PASSWORD` to that same password, then fully restart VS Code. The defaults are `127.0.0.1:3306`, database `school_management`, and user `school_app`. `SCHOOL_DB_URL` and `SCHOOL_DB_USER` can override them.
+6. Open the repository root in VS Code. Install **Extension Pack for Java** and **Maven for Java**, then let Maven import the project and download Connector/J.
+7. Open `src/schoolmanagement/za/App.java` and select **Run** above `main`.
 
-3. Configure the Apache Derby database connection.
+The learner register accepts 13-digit South African ID numbers with valid dates and checksums. The database primary key prevents the same ID from being stored twice. Format and checksum validation does not verify that Home Affairs issued an ID.
 
-4. Run the application from:
+To build a Windows app-image with a bundled Java runtime, run `package-windows.ps1` from PowerShell. Packaging requires Maven 3.6.3 or later and JDK 21. MySQL Server must still be installed and running on the target computer; the app-image bundles the Java runtime and JDBC driver, not the database server.
 
-App.java
+The old Derby database is not copied automatically. Export and import its records if you need to retain them.
+
+On first launch without an administrator, use **Set Up First Administrator**. After that, only admins can manage staff. Teachers can manage their own marks and attendance records; principals and admins can manage learners and view all marks and attendance. Old plain-text staff passwords are upgraded to salted PBKDF2 hashes after successful sign-in.
+
+When upgrading an existing MySQL database, the app adds a learner foreign key if every existing mark points to a registered learner. To locate unmatched records, run this in Workbench and correct them before adding the constraint:
+
+```sql
+SELECT m.mark_id, m.learner_id, m.learner_name
+FROM StudentMark m
+LEFT JOIN Leaner l ON l.id = m.learner_id
+WHERE l.id IS NULL;
+```
+
+Backups contain learner and staff information, including password hashes. Store them securely. Restoring replaces current records; the app asks for confirmation first.
 
 ---
 
-## Future Improvements
+## Database Setup Script
 
-- Attendance management
-- Report generation
-- Export academic reports
-- Improved user roles and permissions
-- Additional database support
+`database/mysql-setup.sql` creates the database, app account, and initial tables. Use a strong password in place of the sample value. Do not commit a real password to the repository.
 
 ---
 

@@ -1,42 +1,53 @@
 package schoolmanagement.za;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 
-public class leanerDatabase implements LeanerManagementInterface<Leaner> {
-    private final Connection connection;
+public class leanerDatabase implements LeanerManagementInterface<Leaner>, AutoCloseable {
+    private Connection connection;
 
     public leanerDatabase() {
-        try {
-            connection = DriverManager.getConnection(
-                    DatabaseConfig.URL,
-                    DatabaseConfig.USER,
-                    DatabaseConfig.PASSWORD
-            );
-            createTableIfMissing();
-        } catch (SQLException ex) {
-            throw new IllegalStateException("Could not connect to database", ex);
+    }
+
+    @Override
+    public synchronized void close() {
+        if (connection != null) {
+            try { connection.close(); } catch (SQLException ex) { throw DatabaseErrors.failure("Could not close the learner database connection.", ex); }
+            connection = null;
         }
+    }
+
+    private synchronized Connection ensureConnection() throws SQLException {
+        if (connection == null || connection.isClosed()) {
+            connection = DatabaseConfig.openConnection();
+            try {
+                createTableIfMissing();
+            } catch (SQLException ex) {
+                connection.close();
+                connection = null;
+                throw ex;
+            }
+        }
+        return connection;
     }
 
     @Override
     public boolean addLeaner(Leaner learner) {
         String sql = "INSERT INTO Leaner(name, id, contact, grade) VALUES (?, ?, ?, ?)";
 
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+        try (PreparedStatement ps = ensureConnection().prepareStatement(sql)) {
             ps.setString(1, learner.getFullname());
             ps.setString(2, learner.getId());
             ps.setString(3, learner.getContact());
             ps.setInt(4, learner.getGrade());
             return ps.executeUpdate() > 0;
         } catch (SQLException ex) {
-            System.out.println(ex.getMessage());
-            return false;
+            if (DatabaseErrors.isConstraintViolation(ex)) return false;
+            throw DatabaseErrors.failure("Could not add learner.", ex);
         }
     }
 
@@ -44,12 +55,12 @@ public class leanerDatabase implements LeanerManagementInterface<Leaner> {
     public boolean delete(Leaner learner) {
         String sql = "DELETE FROM Leaner WHERE id=?";
 
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+        try (PreparedStatement ps = ensureConnection().prepareStatement(sql)) {
             ps.setString(1, learner.getId());
             return ps.executeUpdate() > 0;
         } catch (SQLException ex) {
-            System.out.println(ex.getMessage());
-            return false;
+            if (DatabaseErrors.isConstraintViolation(ex)) return false;
+            throw DatabaseErrors.failure("Could not remove learner.", ex);
         }
     }
 
@@ -58,7 +69,7 @@ public class leanerDatabase implements LeanerManagementInterface<Leaner> {
         String sql = "SELECT name, id, contact, grade FROM Leaner";
         ArrayList<Leaner> learners = new ArrayList<>();
 
-        try (PreparedStatement ps = connection.prepareStatement(sql);
+        try (PreparedStatement ps = ensureConnection().prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
                 learners.add(new Leaner(
@@ -69,7 +80,7 @@ public class leanerDatabase implements LeanerManagementInterface<Leaner> {
                 ));
             }
         } catch (SQLException ex) {
-            System.out.println(ex.getMessage());
+            throw DatabaseErrors.failure("Could not load learner register.", ex);
         }
 
         return learners;
@@ -79,20 +90,20 @@ public class leanerDatabase implements LeanerManagementInterface<Leaner> {
     public boolean updateLeaner(String id, Leaner learner) {
         String sql = "UPDATE Leaner SET name=?, contact=?, grade=? WHERE id=?";
 
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+        try (PreparedStatement ps = ensureConnection().prepareStatement(sql)) {
             ps.setString(1, learner.getFullname());
             ps.setString(2, learner.getContact());
             ps.setInt(3, learner.getGrade());
             ps.setString(4, id);
             return ps.executeUpdate() > 0;
         } catch (SQLException ex) {
-            System.out.println(ex.getMessage());
-            return false;
+            if (DatabaseErrors.isConstraintViolation(ex)) return false;
+            throw DatabaseErrors.failure("Could not update learner.", ex);
         }
     }
 
     private void createTableIfMissing() throws SQLException {
-        String sql = "CREATE TABLE Leaner ("
+        String sql = "CREATE TABLE IF NOT EXISTS Leaner ("
                 + "id VARCHAR(13) NOT NULL, "
                 + "name VARCHAR(100) NOT NULL, "
                 + "contact VARCHAR(10) NOT NULL, "
@@ -101,10 +112,6 @@ public class leanerDatabase implements LeanerManagementInterface<Leaner> {
 
         try (Statement statement = connection.createStatement()) {
             statement.executeUpdate(sql);
-        } catch (SQLException ex) {
-            if (!"X0Y32".equals(ex.getSQLState())) {
-                throw ex;
-            }
         }
     }
 }

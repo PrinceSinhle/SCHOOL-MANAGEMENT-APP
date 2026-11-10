@@ -50,11 +50,8 @@ public class Leaner {
 
     @Override
     public String toString() {
-        return "Leaner{"
-                + "fullname='" + fullname + '\''
-                + ", grade=" + grade
-                + ", id='" + id + '\''
-                + ", contact='" + contact + '\''
-                + '}';
+        return id == null || id.isEmpty()
+                ? "Select a learner"
+                : fullname + " — Grade " + grade + " · " + id;
     }
 }

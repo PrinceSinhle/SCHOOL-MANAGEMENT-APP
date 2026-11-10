@@ -46,18 +46,35 @@ public class TeacherGui extends JFrame {
     };
     private final JTable table = new JTable(tableModel);
     private final TeacherManagement teacherManagement = new TeacherManagement();
+    private final Teacher actor;
+    private final boolean bootstrapMode;
 
-    public TeacherGui() {
+    public TeacherGui(Teacher actor, boolean bootstrapMode) {
+        this.actor = actor;
+        this.bootstrapMode = bootstrapMode;
+        if (!bootstrapMode && !TeacherManagement.isAdministrator(actor)) {
+            throw new SecurityException("Staff management is restricted to the first-run setup or an administrator.");
+        }
         configureWindow();
+        DesktopNavigation.installBackNavigation(this, this::goBack);
+        DesktopTheme.styleTable(table);
         configureQualificationButtons();
+        if (bootstrapMode) {
+            roleComboBox.setSelectedItem("admin");
+            roleComboBox.setEnabled(false);
+        }
         add(buildMainPanel());
         registerEvents();
+        UiTasks.closeOnDispose(this, teacherManagement);
+        if (!bootstrapMode) {
+            loadTeachers();
+        }
     }
 
     private void configureWindow() {
-        setTitle("Teacher Management");
-        setSize(760, 520);
-        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setTitle("School Management");
+        setSize(900, 560);
+        setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null);
     }
 
@@ -92,7 +109,7 @@ public class TeacherGui extends JFrame {
         addFormRow(formPanel, gbc, 0, "Full Name", nameField);
         addFormRow(formPanel, gbc, 1, "Teacher ID", idField);
         addFormRow(formPanel, gbc, 2, "Phone Number", phoneField);
-        addFormRow(formPanel, gbc, 3, "Password", passwordField);
+        addFormRow(formPanel, gbc, 3, "Password (blank keeps current)", passwordField);
         addFormRow(formPanel, gbc, 4, "Role", roleComboBox);
 
         wrapper.add(formPanel, BorderLayout.CENTER);
@@ -112,25 +129,29 @@ public class TeacherGui extends JFrame {
     }
 
     private JPanel buildButtonPanel() {
-        JPanel panel = new JPanel(new GridLayout(1, 5, 8, 0));
+        JPanel panel = new JPanel(new GridLayout(1, 6, 8, 0));
 
         JButton addButton = new JButton("Add");
         JButton updateButton = new JButton("Update");
         JButton deleteButton = new JButton("Delete");
         JButton resetButton = new JButton("Reset");
         JButton loadButton = new JButton("Load");
+        JButton backButton = new JButton(bootstrapMode ? "Back to Login" : "Back to Dashboard");
+        DesktopTheme.stylePrimary(addButton);
 
         addButton.addActionListener(event -> addTeacher());
         updateButton.addActionListener(event -> updateTeacher());
         deleteButton.addActionListener(event -> deleteTeacher());
         resetButton.addActionListener(event -> resetForm());
         loadButton.addActionListener(event -> loadTeachers());
+        backButton.addActionListener(event -> goBack());
 
         panel.add(addButton);
         panel.add(updateButton);
         panel.add(deleteButton);
         panel.add(resetButton);
         panel.add(loadButton);
+        panel.add(backButton);
 
         return panel;
     }
@@ -144,18 +165,30 @@ public class TeacherGui extends JFrame {
     }
 
     private void addTeacher() {
-        Teacher teacher = buildTeacherFromForm();
+        Teacher teacher = buildTeacherFromForm(false);
         if (teacher == null) {
             return;
         }
 
-        if (teacherManagement.addTeacher(teacher)) {
+        UiTasks.run(this, "Saving staff account", () -> bootstrapMode
+                ? teacherManagement.addFirstAdministrator(teacher)
+                : teacherManagement.addTeacher(actor, teacher), added -> {
+        if (added) {
             addTeacherToTable(teacher);
             resetForm();
-            JOptionPane.showMessageDialog(this, "Teacher added successfully.");
+            if (bootstrapMode) {
+                JOptionPane.showMessageDialog(this, "Administrator account created. Please sign in.");
+                dispose();
+                new Login().setVisible(true);
+            } else {
+                JOptionPane.showMessageDialog(this, "Teacher added successfully.");
+            }
         } else {
-            showError("Teacher was not added. Check whether the ID already exists.");
+            showError(bootstrapMode
+                    ? "The first administrator could not be created. An administrator may already exist or the ID may be in use."
+                    : "Teacher was not added. Check whether the ID already exists.");
         }
+        });
     }
 
     private void updateTeacher() {
@@ -165,23 +198,24 @@ public class TeacherGui extends JFrame {
             return;
         }
 
-        Teacher teacher = buildTeacherFromForm();
+        Teacher teacher = buildTeacherFromForm(true);
         if (teacher == null) {
             return;
         }
 
         String originalId = tableModel.getValueAt(selectedRow, 1).toString();
-        if (teacherManagement.updateTeacher(originalId, teacher)) {
+        UiTasks.run(this, "Updating staff account", () -> teacherManagement.updateTeacher(actor, originalId, teacher), updated -> {
+        if (updated) {
             tableModel.setValueAt(teacher.getFullName(), selectedRow, 0);
-            tableModel.setValueAt(teacher.getTeacherId(), selectedRow, 1);
             tableModel.setValueAt(teacher.getPhoneNumber(), selectedRow, 2);
             tableModel.setValueAt(teacher.getRole(), selectedRow, 3);
             tableModel.setValueAt(teacher.getQualification(), selectedRow, 4);
             resetForm();
             JOptionPane.showMessageDialog(this, "Teacher updated successfully.");
         } else {
-            showError("Teacher was not updated.");
+            showError("Teacher was not updated. The last administrator cannot be demoted.");
         }
+        });
     }
 
     private void deleteTeacher() {
@@ -194,29 +228,43 @@ public class TeacherGui extends JFrame {
             return;
         }
 
-        if (teacherManagement.remove(teacherId.trim())) {
-            removeTeacherFromTable(teacherId.trim());
+        String idToRemove = teacherId.trim();
+        if (JOptionPane.showConfirmDialog(this, "Remove staff account " + idToRemove + "?",
+                "Confirm removal", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) return;
+        UiTasks.run(this, "Removing staff account", () -> teacherManagement.remove(actor, idToRemove), removed -> {
+        if (removed) {
+            removeTeacherFromTable(idToRemove);
             resetForm();
             JOptionPane.showMessageDialog(this, "Teacher removed successfully.");
         } else {
-            showError("Teacher was not removed.");
+            showError("Teacher was not removed. You cannot remove your own account or the last administrator, and accounts referenced by attendance must be retained.");
         }
+        });
     }
 
     private void loadTeachers() {
-        tableModel.setRowCount(0);
-        ArrayList<Teacher> teachers = teacherManagement.getAll();
-        for (Teacher teacher : teachers) {
-            addTeacherToTable(teacher);
+        UiTasks.run(this, "Loading staff accounts", () -> teacherManagement.getAll(actor), teachers -> {
+            tableModel.setRowCount(0);
+            for (Teacher teacher : teachers) addTeacherToTable(teacher);
+        });
+    }
+
+    private void goBack() {
+        if (bootstrapMode) {
+            DesktopNavigation.returnToLogin(this);
+        } else {
+            DesktopNavigation.returnToDashboard(this, actor);
         }
     }
 
-    private Teacher buildTeacherFromForm() {
+    private Teacher buildTeacherFromForm(boolean updating) {
         String fullName = nameField.getText().trim();
         String teacherId = idField.getText().trim();
         String phoneNumber = phoneField.getText().trim();
-        String password = new String(passwordField.getPassword());
-        String role = roleComboBox.getSelectedItem().toString();
+        char[] enteredPassword = passwordField.getPassword();
+        String password = new String(enteredPassword);
+        java.util.Arrays.fill(enteredPassword, '\0');
+        String role = bootstrapMode ? "admin" : roleComboBox.getSelectedItem().toString();
         String qualification = getSelectedQualification();
 
         if (fullName.isEmpty()) {
@@ -231,11 +279,12 @@ public class TeacherGui extends JFrame {
             return showValidationError("Phone number must start with 0 and be exactly 10 digits.", phoneField);
         }
 
-        if (password.length() < 10 || !password.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?\\d].*")) {
+        if ((!updating || !password.isEmpty()) && (password.length() < 10
+                || !password.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?\\d].*"))) {
             return showValidationError("Password must be at least 10 characters and contain a number or special character.", passwordField);
         }
 
-        if (roleComboBox.getSelectedIndex() == 0) {
+        if (!bootstrapMode && roleComboBox.getSelectedIndex() == 0) {
             return showValidationError("Please select a role.", roleComboBox);
         }
 
@@ -271,6 +320,7 @@ public class TeacherGui extends JFrame {
 
         nameField.setText(tableModel.getValueAt(selectedRow, 0).toString());
         idField.setText(tableModel.getValueAt(selectedRow, 1).toString());
+        idField.setEditable(false);
         phoneField.setText(tableModel.getValueAt(selectedRow, 2).toString());
         roleComboBox.setSelectedItem(tableModel.getValueAt(selectedRow, 3).toString());
         selectQualification(tableModel.getValueAt(selectedRow, 4).toString());
@@ -311,9 +361,10 @@ public class TeacherGui extends JFrame {
     private void resetForm() {
         nameField.setText("");
         idField.setText("");
+        idField.setEditable(true);
         phoneField.setText("");
         passwordField.setText("");
-        roleComboBox.setSelectedIndex(0);
+        roleComboBox.setSelectedItem(bootstrapMode ? "admin" : "Select role");
         qualificationGroup.clearSelection();
         table.clearSelection();
     }

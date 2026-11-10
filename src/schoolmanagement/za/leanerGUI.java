@@ -21,7 +21,7 @@ import javax.swing.table.DefaultTableModel;
 
 public class leanerGUI extends JFrame {
     private static final String[] GRADES = {"Select grade", "1", "2", "3", "4", "5", "6", "7"};
-    private static final String[] COLUMNS = {"Full Name", "ID", "Grade", "Contact"};
+    private static final String[] COLUMNS = {"Full Name", "South African ID", "Grade", "Contact"};
 
     private final JTextField nameField = new JTextField(20);
     private final JTextField idField = new JTextField(20);
@@ -34,17 +34,27 @@ public class leanerGUI extends JFrame {
         }
     };
     private final JTable table = new JTable(tableModel);
-    private final leanerManagement learnerManagement = new leanerManagement();
+    private final leanerManagement learnerManagement;
+    private final Teacher actor;
 
-    public leanerGUI() {
+    public leanerGUI(Teacher actor) {
+        if (!TeacherManagement.canManageLearners(actor)) {
+            throw new SecurityException("Learner management requires an administrator or principal account.");
+        }
+        this.actor = actor;
+        this.learnerManagement = new leanerManagement();
         configureWindow();
+        DesktopNavigation.installBackNavigation(this, this::backToDashboard);
+        DesktopTheme.styleTable(table);
         add(buildMainPanel());
         registerEvents();
+        UiTasks.closeOnDispose(this, learnerManagement);
+        loadLearners();
     }
 
     private void configureWindow() {
         setTitle("Learner Management");
-        setSize(720, 500);
+        setSize(860, 520);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null);
     }
@@ -76,7 +86,7 @@ public class leanerGUI extends JFrame {
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
         addFormRow(formPanel, gbc, 0, "Full Name", nameField);
-        addFormRow(formPanel, gbc, 1, "ID", idField);
+        addFormRow(formPanel, gbc, 1, "South African ID (13 digits)", idField);
         addFormRow(formPanel, gbc, 2, "Contact", contactField);
         addFormRow(formPanel, gbc, 3, "Grade", gradeComboBox);
 
@@ -90,19 +100,20 @@ public class leanerGUI extends JFrame {
         JButton removeButton = new JButton("Remove");
         JButton loadButton = new JButton("Load");
         JButton updateButton = new JButton("Update");
-        JButton exitButton = new JButton("Exit");
+        JButton backButton = new JButton("Back to Dashboard");
+        DesktopTheme.stylePrimary(addButton);
 
         addButton.addActionListener(event -> addLearner());
         removeButton.addActionListener(event -> removeLearner());
         loadButton.addActionListener(event -> loadLearners());
         updateButton.addActionListener(event -> updateLearner());
-        exitButton.addActionListener(event -> dispose());
+        backButton.addActionListener(event -> backToDashboard());
 
         panel.add(addButton);
         panel.add(removeButton);
         panel.add(loadButton);
         panel.add(updateButton);
-        panel.add(exitButton);
+        panel.add(backButton);
 
         return panel;
     }
@@ -113,6 +124,10 @@ public class leanerGUI extends JFrame {
                 populateFormFromSelectedRow();
             }
         });
+    }
+
+    private void backToDashboard() {
+        DesktopNavigation.returnToDashboard(this, actor);
     }
 
     private void addLearner() {
@@ -126,13 +141,12 @@ public class leanerGUI extends JFrame {
             return;
         }
 
-        if (learnerManagement.addLeaner(learner)) {
+        UiTasks.run(this, "Saving learner", () -> learnerManagement.addLeaner(actor, learner), saved -> {
+            if (!saved) { showError("This South African ID is already in use. Each learner must have a unique ID."); return; }
             addLearnerToTable(learner);
             resetForm();
             JOptionPane.showMessageDialog(this, "Learner added successfully.");
-        } else {
-            showError("Learner was not added. Check whether the ID already exists.");
-        }
+        });
     }
 
     private void removeLearner() {
@@ -145,21 +159,22 @@ public class leanerGUI extends JFrame {
             return;
         }
 
-        if (learnerManagement.removeLeaner(learnerId.trim())) {
-            removeLearnerFromTable(learnerId.trim());
+        if (JOptionPane.showConfirmDialog(this, "Remove learner " + learnerId.trim() + "?",
+                "Confirm removal", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) return;
+        String idToRemove = learnerId.trim();
+        UiTasks.run(this, "Removing learner", () -> learnerManagement.removeLeaner(actor, idToRemove), removed -> {
+            if (!removed) { showError("Learner was not removed. Check whether marks or attendance still reference this learner."); return; }
+            removeLearnerFromTable(idToRemove);
             resetForm();
             JOptionPane.showMessageDialog(this, "Learner removed successfully.");
-        } else {
-            showError("Learner was not removed.");
-        }
+        });
     }
 
     private void loadLearners() {
-        tableModel.setRowCount(0);
-        ArrayList<Leaner> learners = learnerManagement.getAll();
-        for (Leaner learner : learners) {
-            addLearnerToTable(learner);
-        }
+        UiTasks.run(this, "Loading learner register", () -> learnerManagement.getAll(actor), learners -> {
+            tableModel.setRowCount(0);
+            for (Leaner learner : learners) addLearnerToTable(learner);
+        });
     }
 
     private void updateLearner() {
@@ -175,15 +190,14 @@ public class leanerGUI extends JFrame {
         }
 
         String originalId = tableModel.getValueAt(selectedRow, 1).toString();
-        if (learnerManagement.updateLeaner(originalId, learner)) {
+        UiTasks.run(this, "Updating learner", () -> learnerManagement.updateLeaner(actor, originalId, learner), updated -> {
+            if (!updated) { showError("Learner was not updated."); return; }
             tableModel.setValueAt(learner.getFullname(), selectedRow, 0);
             tableModel.setValueAt(learner.getGrade(), selectedRow, 2);
             tableModel.setValueAt(learner.getContact(), selectedRow, 3);
             resetForm();
             JOptionPane.showMessageDialog(this, "Learner updated successfully.");
-        } else {
-            showError("Learner was not updated.");
-        }
+        });
     }
 
     private Leaner buildLearnerFromForm(boolean validateId) {
@@ -201,8 +215,8 @@ public class leanerGUI extends JFrame {
             return showValidationError("Name can only contain letters and spaces.", nameField);
         }
 
-        if (validateId && !learnerId.matches("\\d{13}")) {
-            return showValidationError("ID must be exactly 13 digits.", idField);
+        if (validateId && !SouthAfricanIdValidator.isValid(learnerId)) {
+            return showValidationError("Enter a 13-digit South African ID with a valid date and checksum.", idField);
         }
 
         if (!contact.matches("0\\d{9}")) {

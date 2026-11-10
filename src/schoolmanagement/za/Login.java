@@ -17,11 +17,15 @@ public class Login extends JFrame {
     private final JTextField teacherIdField = new JTextField(20);
     private final JPasswordField passwordField = new JPasswordField(20);
     private final TeacherManagement teacherManagement = new TeacherManagement();
+    private final JButton setupButton = new JButton("Set Up First Administrator");
+    private final JButton loginButton = new JButton("Login");
 
     public Login() {
         configureWindow();
         add(buildMainPanel());
         registerEvents();
+        UiTasks.closeOnDispose(this, teacherManagement);
+        checkFirstAdministrator();
     }
 
     private void configureWindow() {
@@ -52,7 +56,7 @@ public class Login extends JFrame {
         gbc.insets = new Insets(6, 6, 6, 6);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        addFormRow(formPanel, gbc, 0, "Teacher ID", teacherIdField);
+        addFormRow(formPanel, gbc, 0, " ID", teacherIdField);
         addFormRow(formPanel, gbc, 1, "Password", passwordField);
 
         return formPanel;
@@ -60,13 +64,15 @@ public class Login extends JFrame {
 
     private JPanel buildButtonPanel() {
         JPanel buttonPanel = new JPanel();
-        JButton registerButton = new JButton("Register Teacher");
-        JButton loginButton = new JButton("Login");
+        setupButton.setVisible(false);
+        loginButton.setEnabled(false);
+        DesktopTheme.stylePrimary(loginButton);
+        DesktopTheme.stylePrimary(setupButton);
 
-        registerButton.addActionListener(event -> openTeacherRegistration());
+        setupButton.addActionListener(event -> openTeacherRegistration());
         loginButton.addActionListener(event -> login());
 
-        buttonPanel.add(registerButton);
+        buttonPanel.add(setupButton);
         buttonPanel.add(loginButton);
         return buttonPanel;
     }
@@ -77,25 +83,59 @@ public class Login extends JFrame {
 
     private void login() {
         String teacherId = teacherIdField.getText().trim();
-        String password = new String(passwordField.getPassword());
+        char[] password = passwordField.getPassword();
 
-        if (teacherId.isEmpty() || password.isEmpty()) {
+        if (teacherId.isEmpty() || password.length == 0) {
+            java.util.Arrays.fill(password, '\0');
             showError("Please enter your teacher ID and password.");
             return;
         }
-
-        if (teacherManagement.login(teacherId, password)) {
-            JOptionPane.showMessageDialog(this, "Login successful.");
-            new TeacherDashboardGui(teacherManagement.getTeacher(teacherId)).setVisible(true);
-            dispose();
-        } else {
-            showError("Invalid teacher ID or password.");
-        }
+        passwordField.setText("");
+        UiTasks.run(this, "Signing in", () -> {
+            try {
+                boolean authenticated = teacherManagement.login(teacherId, password);
+                return new LoginResult(authenticated,
+                        authenticated ? teacherManagement.getTeacher(teacherId) : null);
+            } finally {
+                java.util.Arrays.fill(password, '\0');
+            }
+        }, result -> {
+            if (result.authenticated) {
+                new TeacherDashboardGui(result.teacher).setVisible(true);
+                dispose();
+            } else {
+                showError("Invalid teacher ID or password.");
+            }
+        });
     }
 
     private void openTeacherRegistration() {
-        new TeacherGui().setVisible(true);
-        dispose();
+        UiTasks.run(this, "Checking first-run setup", () -> teacherManagement.hasAdministrator(), hasAdmin -> {
+            if (hasAdmin) {
+                showError("The first administrator is already set up. Sign in to manage staff.");
+                setupButton.setVisible(false);
+            } else {
+                new TeacherGui(null, true).setVisible(true);
+                dispose();
+            }
+        });
+    }
+
+    private void checkFirstAdministrator() {
+        UiTasks.run(this, "Connecting to the school database", () -> teacherManagement.hasAdministrator(), hasAdmin -> {
+            setupButton.setVisible(!hasAdmin);
+            loginButton.setEnabled(true);
+        });
+    }
+
+    private static final class LoginResult {
+        private final boolean authenticated;
+        private final Teacher teacher;
+
+        private LoginResult(boolean authenticated, Teacher teacher) {
+            this.authenticated = authenticated;
+            this.teacher = teacher;
+        }
     }
 
     private void addFormRow(JPanel panel, GridBagConstraints gbc, int row, String labelText, JTextField field) {
